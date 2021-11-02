@@ -1,6 +1,7 @@
 package com.example.simplemediaapp;
 
 import static android.content.Intent.ACTION_LOCALE_CHANGED;
+import static android.support.v4.media.MediaBrowserCompat.MediaItem.FLAG_PLAYABLE;
 import static android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ART;
 import static android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST;
 import static android.support.v4.media.MediaMetadataCompat.METADATA_KEY_DURATION;
@@ -20,6 +21,8 @@ import static android.support.v4.media.session.PlaybackStateCompat.STATE_PAUSED;
 import static android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING;
 import static android.support.v4.media.session.PlaybackStateCompat.STATE_STOPPED;
 import static com.example.simplemediaapp.NotificationHandler.NOTIFICATION_ID;
+import static com.example.simplemediaapp.Songs.getSongIdx;
+import static com.example.simplemediaapp.Songs.songs;
 
 import android.content.BroadcastReceiver;
 import android.content.Intent;
@@ -27,11 +30,11 @@ import android.content.IntentFilter;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.support.v4.media.MediaBrowserCompat.MediaItem;
+import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.RatingCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -39,11 +42,12 @@ import androidx.media.MediaBrowserServiceCompat;
 import com.hectorricardo.player.Player;
 import com.hectorricardo.player.Player.PlayerListener;
 import com.hectorricardo.player.Song;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MediaService extends MediaBrowserServiceCompat {
 
-  private final Song song = new Song("My Hit", "Hector Ricardo", 30000);
+  private final Song song = new Song("myHit", "My Hit", "Hector Ricardo", 30000);
 
   private static final IntentFilter localeChangedFilter = new IntentFilter(ACTION_LOCALE_CHANGED);
 
@@ -66,6 +70,22 @@ public class MediaService extends MediaBrowserServiceCompat {
   private final Player player =
       new Player(
           new PlayerListener() {
+            @Override
+            public void onPlaybackStarted(long progress) {
+              mediaSession.setPlaybackState(
+                  stateBuilder
+                      .setState(STATE_PLAYING, progress, 1)
+                      .setActions(
+                          ACTION_PAUSE
+                              | ACTION_PLAY_PAUSE
+                              | ACTION_STOP
+                              | ACTION_SKIP_TO_NEXT
+                              | ACTION_SKIP_TO_PREVIOUS
+                              | ACTION_SEEK_TO)
+                      .build());
+              startForeground(NOTIFICATION_ID, notificationsHandler.createNotification());
+            }
+
             @Override
             public void onPaused() {
               mediaSession.setPlaybackState(
@@ -95,6 +115,7 @@ public class MediaService extends MediaBrowserServiceCompat {
                               | ACTION_SKIP_TO_PREVIOUS
                               | ACTION_SEEK_TO)
                       .build());
+              stopForeground(false);
               notificationsHandler.updateNotification();
             }
 
@@ -106,41 +127,36 @@ public class MediaService extends MediaBrowserServiceCompat {
                       .build());
               notificationsHandler.updateNotification();
             }
+
+            @Override
+            public void onSongChanged() {}
           });
 
   private boolean started = false;
   private final MediaSessionCompat.Callback mediaSessionCallback =
       new MediaSessionCompat.Callback() {
-        @Override
-        public void onPlay() {
-          Log.d("MyMediumService", "ONPLAY");
+
+        private void prepareForPlayback() {
           if (!started) {
             ContextCompat.startForegroundService(
                 MediaService.this, new Intent(MediaService.this, MediaService.class));
-          }
-
-          mediaSession.setPlaybackState(
-              stateBuilder
-                  .setState(STATE_PLAYING, player.getProgress(), 1)
-                  .setActions(
-                      ACTION_PAUSE
-                          | ACTION_PLAY_PAUSE
-                          | ACTION_STOP
-                          | ACTION_SKIP_TO_NEXT
-                          | ACTION_SKIP_TO_PREVIOUS
-                          | ACTION_SEEK_TO)
-                  .build());
-          mediaSession.setActive(true);
-
-          player.play(song);
-
-          startForeground(NOTIFICATION_ID, notificationsHandler.createNotification());
-          if (!started) {
             notificationsHandler.registerReceivers();
             registerReceiver(localeChangedReceiver, localeChangedFilter);
+            started = true;
           }
+          mediaSession.setActive(true);
+        }
 
-          started = true;
+        @Override
+        public void onPlayFromMediaId(String mediaId, Bundle extras) {
+          prepareForPlayback();
+          player.play(songs[getSongIdx(mediaId)]);
+        }
+
+        @Override
+        public void onPlay() {
+          prepareForPlayback();
+          player.play();
         }
 
         @Override
@@ -148,10 +164,17 @@ public class MediaService extends MediaBrowserServiceCompat {
           player.pause();
         }
 
+        /**
+         * This method runs when the notification is dismissed.
+         * Despite its name, this method doesn't stop the player itself. Rather, the player should
+         * be already stopped by the time this method is called. It does media session cleanup.
+         */
         @Override
         public void onStop() {
-          super.onStop();
-          Log.d("HR-SMA", "ONSTOP");
+          mediaSession.setActive(false);
+          notificationsHandler.unregisterReceivers();
+          unregisterReceiver(localeChangedReceiver);
+          started = false;
         }
 
         @Override
@@ -171,7 +194,7 @@ public class MediaService extends MediaBrowserServiceCompat {
             mediaSession.setPlaybackState(stateBuilder.setState(STATE_BUFFERING, pos, 1).build());
           }
 
-          player.setProgress(pos);
+          player.seekTo(pos);
         }
 
         @Override
@@ -206,12 +229,6 @@ public class MediaService extends MediaBrowserServiceCompat {
     notificationsHandler.setSong();
   }
 
-  @Override
-  public void onDestroy() {
-    super.onDestroy();
-    notificationsHandler.unregisterReceivers();
-  }
-
   @Nullable
   @Override
   public BrowserRoot onGetRoot(
@@ -221,6 +238,21 @@ public class MediaService extends MediaBrowserServiceCompat {
 
   @Override
   public void onLoadChildren(@NonNull String parentId, @NonNull Result<List<MediaItem>> result) {
-    result.sendResult(null);
+    if (!parentId.isEmpty()) {
+      result.sendResult(null);
+      return;
+    }
+
+    MediaDescriptionCompat.Builder mediaDescriptionBuilder = new MediaDescriptionCompat.Builder();
+
+    List<MediaItem> mediaItems = new ArrayList<>(songs.length);
+    for (Song song : songs) {
+      mediaItems.add(
+          new MediaItem(
+              mediaDescriptionBuilder.setTitle(song.title).setSubtitle(song.artist).build(),
+              FLAG_PLAYABLE));
+    }
+
+    result.sendResult(mediaItems);
   }
 }
