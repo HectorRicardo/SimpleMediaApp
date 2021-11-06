@@ -113,29 +113,34 @@ public class Player {
     return stateOps.getProgress();
   }
 
-  // The methods of this class will never interleave with the methods of the Player class (because
+  // Most methods of this class will never interleave with the methods of the Player class (because
   // the Player's methods are either synchronized or called from within a synchronized block). If
-  // the player is PLAYING, all the methods of PlayerListenerInternal are called from within a
+  // the player is PLAYING, most methods of PlayerListenerInternal are called from within a
   // synchronized block.
   class PlayerListenerInternal {
 
-    private final PlayerListener playerListener;
+    private final PlayerListener userFacingPlayerListener;
 
-    private PlayerListenerInternal(PlayerListener playerListener) {
-      this.playerListener = playerListener;
+    private PlayerListenerInternal(PlayerListener userFacingPlayerListener) {
+      this.userFacingPlayerListener = userFacingPlayerListener;
     }
 
-    void onPlaybackStartedOrResumed(long progress, boolean sought) {
+    // No need for this method to be synchronized. It doesn't modify any shared state variables.
+    // All the player calls that interrupt the background thread won't have any effect if they
+    // interleave with these callbacks. It's impossible that any other callback happen before this
+    // callback. This is because, when this method executes, even if the interrupt signal has
+    // already been sent, it hasn't even been observed by the background thread yet.
+    void onThreadStarted(long progress, boolean sought) {
       if (sought) {
-        playerListener.onSought(true, progress);
+        userFacingPlayerListener.onSought(true, progress);
       } else {
-        playerListener.onPlaybackStarted(progress);
+        userFacingPlayerListener.onPlaybackStarted(progress);
       }
     }
 
-    void onPaused(StoppedStateOps stateOps) {
+    Runnable onPaused(StoppedStateOps stateOps) {
       Player.this.stateOps = stateOps;
-      playerListener.onPaused();
+      return userFacingPlayerListener::onPaused;
     }
 
     void onFinished() {
@@ -149,7 +154,13 @@ public class Player {
       } else {
         throw new RuntimeException("Something terribly wrong");
       }
-      playerListener.onFinished();
+      // This should be inside the synchronized block. Even though it doesn't modify any shared
+      // state, the following super rare case could happen: Imagine this statement were outside the
+      // synchronized block, and we issued from the main thread a `seekTo()` command. It could be
+      // the case that the corresponding `onSought()` callback gets executed first before the
+      // onfinished Callback. We ensure this doesn't happen by putting the user-facing onFinished
+      // inside the synchronized block.
+      userFacingPlayerListener.onFinished();
     }
 
     void onSought(StateOps stateOps, long progress) {
@@ -157,13 +168,13 @@ public class Player {
       // If the player is PLAYING, then postpone the call to the callback until the new thread
       // restarts. Else call callback immediately.
       if (!stateOps.isPlaying()) {
-        playerListener.onSought(false, progress);
+        userFacingPlayerListener.onSought(false, progress);
       }
     }
 
     void onSongSet(StateOps stateOps) {
       Player.this.stateOps = stateOps;
-      playerListener.onSongChanged();
+      userFacingPlayerListener.onSongChanged();
     }
   }
 

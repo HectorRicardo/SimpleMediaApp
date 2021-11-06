@@ -31,9 +31,8 @@ class PlayingStateOps implements StateOps {
     thread =
         new Thread(
             () -> {
-              playerListener.onPlaybackStartedOrResumed(startingProgress, sought);
-
               System.out.println("Playing " + song.id + " from " + startingProgress);
+              playerListener.onThreadStarted(startingProgress, sought);
               startedOn = System.currentTimeMillis();
               try {
                 Thread.sleep(song.duration - startingProgress);
@@ -42,6 +41,7 @@ class PlayingStateOps implements StateOps {
                 }
 
               } catch (InterruptedException ignored) {
+                Runnable runnable = null;
                 synchronized (lock) {
                   if (interruptReason == PROGRESS_SET) {
                     System.out.println("Progress changing");
@@ -53,8 +53,11 @@ class PlayingStateOps implements StateOps {
                   } else {
                     long newProgress = getProgress();
                     System.out.println("Paused on " + newProgress);
-                    playerListener.onPaused(
+                    runnable = playerListener.onPaused(
                         new StoppedStateOps(song, newProgress, lock, playerListener));
+                  }
+                  if (runnable != null) {
+                    runnable.run();
                   }
                 }
               }
