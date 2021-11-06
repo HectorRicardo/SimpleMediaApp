@@ -152,7 +152,7 @@ public class NotificationHandler {
     NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, createNotification());
   }
 
-  // Called when locale changes
+  // Called when initializing or when locale changes
   private void defineActions() {
     previousAction =
         new Action(R.drawable.exo_icon_previous, str(R.string.previous), previousIntent);

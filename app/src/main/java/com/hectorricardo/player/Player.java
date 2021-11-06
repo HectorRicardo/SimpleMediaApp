@@ -44,7 +44,10 @@ package com.hectorricardo.player;
  *
  * <p>All of the methods of this class are thread-safe. This is to ensure that no interleaving will
  * occur between any of the player methods and/or any of the callbacks. This simplifies reasoning
- * about Player instances.
+ * about Player instances. Although in reality, if you just issue player commands from a single
+ * thread or from within the callbacks (that could be running in the about-to-die background
+ * thread), only the following methods and pieces of code should be synchronized: TODO complete
+ * list.
  */
 public class Player {
 
@@ -79,6 +82,9 @@ public class Player {
 
   // This methods blocks until either the background thread finishes (either by calling `onPause()`
   // or `onFinished()`.
+  // I initially had the idea that this method could return a boolean indicated whether the call to
+  // this method caused the onPause callback to be called (99% will be yes, see the comment about
+  // the slim chance above in the class's documentation). However,
   public void pause() {
     issueCommand(
         () -> {
@@ -106,6 +112,9 @@ public class Player {
       stateOps = this.stateOps;
       runnable.run();
     }
+    // It could be that `stateOps` was updated just after we exited the synchronized block above.
+    // For this scenario, we use the auxiliary local variable `stateOps` to make sure we wait
+    // against the original `stateOps`.
     stateOps.waitToFinish();
   }
 
@@ -126,9 +135,9 @@ public class Player {
     }
 
     // No need for this method to be synchronized. It doesn't modify any shared state variables.
-    // All the player calls that interrupt the background thread won't have any effect if they
-    // interleave with these callbacks. It's impossible that any other callback happen before this
-    // callback. This is because, when this method executes, even if the interrupt signal has
+    // All the player command calls that interrupt the background thread won't have any effect if
+    // they interleave with these callbacks. It's impossible that any other callback happens before
+    // this callback. This is because, when this method executes, even if the interrupt signal has
     // already been sent, it hasn't even been observed by the background thread yet.
     void onThreadStarted(long progress, boolean sought) {
       if (sought) {
@@ -140,6 +149,7 @@ public class Player {
 
     Runnable onPaused(StoppedStateOps stateOps) {
       Player.this.stateOps = stateOps;
+      pauseRequested = false;
       return userFacingPlayerListener::onPaused;
     }
 
@@ -154,12 +164,14 @@ public class Player {
       } else {
         throw new RuntimeException("Something terribly wrong");
       }
-      // This should be inside the synchronized block. Even though it doesn't modify any shared
-      // state, the following super rare case could happen: Imagine this statement were outside the
-      // synchronized block, and we issued from the main thread a `seekTo()` command. It could be
-      // the case that the corresponding `onSought()` callback gets executed first before the
-      // onfinished Callback. We ensure this doesn't happen by putting the user-facing onFinished
-      // inside the synchronized block.
+      // This should be inside the synchronized block, even though it doesn't modify any shared
+      // state. Otherwise, the following super rare case could happen: while executing the
+      // `onFinished()` callback, the thread loses control and execution passes back to the main
+      // thread. We then issue from the main thread a `pause()` command (this command is valid
+      // because we already updated `stateOps` above). It's possible that the corresponding
+      // `onPaused()` callback finish its execution first before the `onFinished()` callback, which
+      // would be counter-intuitive. We ensure this doesn't happen by putting the call to the
+      // user-facing `onFinished()` callback inside the synchronized block.
       userFacingPlayerListener.onFinished();
     }
 
