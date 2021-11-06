@@ -156,7 +156,7 @@ public class MediaService extends MediaBrowserServiceCompat {
         @Override
         public void onPlay() {
           prepareForPlayback();
-          player.play();
+          player.play(songs[0]);
         }
 
         @Override

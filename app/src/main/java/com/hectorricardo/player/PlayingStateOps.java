@@ -22,12 +22,16 @@ class PlayingStateOps implements StateOps {
   private volatile int interruptReason;
 
   PlayingStateOps(
-      Song song, long startingProgress, Object lock, PlayerListenerInternal playerListener) {
+      Song song,
+      long startingProgress,
+      boolean sought,
+      Object lock,
+      PlayerListenerInternal playerListener) {
     this.startingProgress = startingProgress;
     thread =
         new Thread(
             () -> {
-              playerListener.onPlaybackStarted(startingProgress);
+              playerListener.onPlaybackStartedOrResumed(startingProgress, sought);
 
               System.out.println("Playing " + song.id + " from " + startingProgress);
               startedOn = System.currentTimeMillis();
@@ -42,10 +46,10 @@ class PlayingStateOps implements StateOps {
                   if (interruptReason == PROGRESS_SET) {
                     System.out.println("Progress changing");
                     playerListener.onSought(
-                        new PlayingStateOps(song, newProgress, lock, playerListener), newProgress);
+                        new PlayingStateOps(song, newProgress, true, lock, playerListener), newProgress);
                   } else if (interruptReason == SONG_SET) {
                     System.out.println("Song changing");
-                    playerListener.onSongSet(new PlayingStateOps(newSong, 0, lock, playerListener));
+                    playerListener.onSongSet(new PlayingStateOps(newSong, 0, false, lock, playerListener));
                   } else {
                     long newProgress = getProgress();
                     System.out.println("Paused on " + newProgress);
@@ -98,5 +102,14 @@ class PlayingStateOps implements StateOps {
   @Override
   public boolean isPlaying() {
     return true;
+  }
+
+  @Override
+  public void waitToFinish() {
+    try {
+      thread.join();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

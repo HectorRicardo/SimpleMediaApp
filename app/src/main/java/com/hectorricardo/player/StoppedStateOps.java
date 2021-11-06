@@ -19,12 +19,12 @@ class StoppedStateOps implements StateOps {
 
   @Override
   public PlayingStateOps play() {
-    return new PlayingStateOps(song, progress, lock, playerListener);
+    return new PlayingStateOps(song, progress, false, lock, playerListener);
   }
 
   @Override
   public PlayingStateOps play(Song song) {
-    return new PlayingStateOps(song, progress, lock, playerListener);
+    return new PlayingStateOps(song, progress, false, lock, playerListener);
   }
 
   @Override
@@ -56,5 +56,10 @@ class StoppedStateOps implements StateOps {
   @Override
   public boolean isPlaying() {
     return false;
+  }
+
+  @Override
+  public void waitToFinish() {
+
   }
 }
