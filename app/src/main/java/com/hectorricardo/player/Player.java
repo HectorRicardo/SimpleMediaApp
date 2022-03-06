@@ -51,17 +51,8 @@ package com.hectorricardo.player;
  */
 public class Player {
 
-  public static final int NO_REPEAT = 0;
-  public static final int REPEAT_SONG = 1;
-  public static final int REPEAT_PLAYLIST = 2;
-
-  private int repeatMode = NO_REPEAT;
-
   private StateOps stateOps;
   private Song song;
-
-  // to make sure that pause commands are respected and do indeed prevent further playback
-  private boolean pauseRequested;
 
   public Player(PlayerListener playerListener) {
     stateOps = new StoppedStateOps(null, 0, this, new PlayerListenerInternal(playerListener));
@@ -87,24 +78,11 @@ public class Player {
   // this method caused the onPause callback to be called (99% will be yes, see the comment about
   // the slim chance above in the class's documentation). However,
   public void pause() {
-    issueCommand(
-        () -> {
-          pauseRequested = true;
-          try {
-            stateOps.stop();
-          } catch (IllegalStateException e) {
-            pauseRequested = false;
-            throw e;
-          }
-        });
+    issueCommand(stateOps::stop);
   }
 
   public void seekTo(long millis) {
     issueCommand(() -> stateOps.seekTo(millis));
-  }
-
-  public synchronized void setRepeatMode(int repeatMode) {
-    this.repeatMode = repeatMode;
   }
 
   private void issueCommand(Runnable runnable) {
@@ -165,21 +143,11 @@ public class Player {
 
     Runnable onPaused(StoppedStateOps stateOps) {
       Player.this.stateOps = stateOps;
-      pauseRequested = false;
       return userFacingPlayerListener::onPaused;
     }
 
     void onFinished() {
-      if (pauseRequested) {
-        stateOps = new StoppedStateOps(song, 0, Player.this, this);
-        pauseRequested = false;
-      } else if (repeatMode == NO_REPEAT) {
-        stateOps = new StoppedStateOps(song, 0, Player.this, this);
-      } else if (repeatMode == REPEAT_SONG) {
-        stateOps = new PlayingStateOps(song, 0, false, Player.this, this);
-      } else {
-        throw new RuntimeException("Something terribly wrong");
-      }
+      stateOps = new StoppedStateOps(song, 0, Player.this, this);
       // This should be inside the synchronized block, even though it doesn't modify any shared
       // state. Otherwise, the following super rare case could happen: while executing the
       // `onFinished()` callback, the thread loses control and execution passes back to the main
