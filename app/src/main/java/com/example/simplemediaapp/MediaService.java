@@ -47,8 +47,6 @@ import java.util.List;
 
 public class MediaService extends MediaBrowserServiceCompat {
 
-  private final Song song = new Song("myHit", "My Hit", "Hector Ricardo", 30000);
-
   private static final IntentFilter localeChangedFilter = new IntentFilter(ACTION_LOCALE_CHANGED);
 
   private final PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder();
@@ -209,8 +207,8 @@ public class MediaService extends MediaBrowserServiceCompat {
     super.onCreate();
 
     mediaSession = new MediaSessionCompat(this, "MyAppService");
-
     mediaSession.setPlaybackState(stateBuilder.setActions(ACTION_PLAY | ACTION_PLAY_PAUSE).build());
+    Song song = songs[0];
     mediaSession.setMetadata(
         metadataBuilder
             .putString(METADATA_KEY_TITLE, song.title)

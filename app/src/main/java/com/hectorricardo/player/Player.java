@@ -51,10 +51,11 @@ package com.hectorricardo.player;
  */
 public class Player {
 
-  public static final int REPEAT_NONE = 0;
+  public static final int NO_REPEAT = 0;
   public static final int REPEAT_SONG = 1;
   public static final int REPEAT_PLAYLIST = 2;
-  private int repeatMode = REPEAT_NONE;
+
+  private int repeatMode = NO_REPEAT;
 
   private StateOps stateOps;
   private Song song;
@@ -112,9 +113,24 @@ public class Player {
       stateOps = this.stateOps;
       runnable.run();
     }
-    // It could be that `stateOps` was updated just after we exited the synchronized block above.
-    // For this scenario, we use the auxiliary local variable `stateOps` to make sure we wait
-    // against the original `stateOps`.
+    // From this point onwards, it could be that `stateOps != this.stateOps`. How?
+    //
+    // If we commanded "pause" while PLAYING: Just after interrupting the thread (i.e, after
+    // the `runnable.run()` statement a few lines above), imagine that the processor switches
+    // context and passes control to the background thread (remember that threads are
+    // non-deterministic so this is quite possible). The background thread, now interrupted, runs
+    // the `onPaused()` callback, which updates `this.stateOps`. Switch back to this thread. Now,
+    // `this.stateOps` is different than it was at the beginning.
+    //
+    // If we commanded "seekTo" while PLAYING: Imagine we are seeking to the very beginning of a
+    // song. The background thread is interrupted. Context switch. The background thread handles the
+    // interruption, and runs the `onSought()` callback, which updates `stateOps` to a new
+    // `PlayingStateOps`. Context switch, and return to this thread. In that case, if we hadn't
+    // stored the original `this.stateOps` in an auxiliar variable, we would be waiting for the new
+    // PlayingStateOps, which hasn't event been sent an interrupt signal! We should instead have
+    // waited for the original stateOps.
+    //
+    // This is the reason we need an additional, auxiliary local `stateOps` variable.
     stateOps.waitToFinish();
   }
 
@@ -157,7 +173,7 @@ public class Player {
       if (pauseRequested) {
         stateOps = new StoppedStateOps(song, 0, Player.this, this);
         pauseRequested = false;
-      } else if (repeatMode == REPEAT_NONE) {
+      } else if (repeatMode == NO_REPEAT) {
         stateOps = new StoppedStateOps(song, 0, Player.this, this);
       } else if (repeatMode == REPEAT_SONG) {
         stateOps = new PlayingStateOps(song, 0, false, Player.this, this);
