@@ -21,7 +21,6 @@ import static android.support.v4.media.session.PlaybackStateCompat.STATE_PAUSED;
 import static android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING;
 import static android.support.v4.media.session.PlaybackStateCompat.STATE_STOPPED;
 import static com.example.simplemediaapp.NotificationHandler.NOTIFICATION_ID;
-import static com.example.simplemediaapp.Songs.getSongIdx;
 import static com.example.simplemediaapp.Songs.songs;
 
 import android.content.BroadcastReceiver;
@@ -146,15 +145,9 @@ public class MediaService extends MediaBrowserServiceCompat {
         }
 
         @Override
-        public void onPlayFromMediaId(String mediaId, Bundle extras) {
-          prepareForPlayback();
-          player.play(songs[getSongIdx(mediaId)]);
-        }
-
-        @Override
         public void onPlay() {
           prepareForPlayback();
-          player.play(songs[0]);
+          player.play();
         }
 
         @Override

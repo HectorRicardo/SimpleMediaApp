@@ -1,5 +1,7 @@
 package com.hectorricardo.player;
 
+import static com.example.simplemediaapp.Songs.songs;
+
 /**
  * Instances of this class simulate (in silence) the playback of a song.
  *
@@ -52,10 +54,10 @@ package com.hectorricardo.player;
 public class Player {
 
   private StateOps stateOps;
-  private Song song;
+  private Song song = songs[0];
 
   public Player(PlayerListener playerListener) {
-    stateOps = new StoppedStateOps(null, 0, this, new PlayerListenerInternal(playerListener));
+    stateOps = new StoppedStateOps(song, 0, this, new PlayerListenerInternal(playerListener));
   }
 
   // Synchronized because a user might call play (wrongly) when the onFinished callback is running.
