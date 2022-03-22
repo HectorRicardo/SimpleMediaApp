@@ -220,6 +220,12 @@ public class MediaService extends MediaBrowserServiceCompat {
     notificationsHandler.setSong();
   }
 
+  @Override
+  public void onDestroy() {
+    notificationsHandler.unregisterReceivers();
+    unregisterReceiver(localeChangedReceiver);
+  }
+
   @Nullable
   @Override
   public BrowserRoot onGetRoot(
