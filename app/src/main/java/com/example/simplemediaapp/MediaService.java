@@ -222,6 +222,10 @@ public class MediaService extends MediaBrowserServiceCompat {
 
   @Override
   public void onDestroy() {
+    super.onDestroy();
+    if (!started) {
+      return;
+    }
     notificationsHandler.unregisterReceivers();
     unregisterReceiver(localeChangedReceiver);
   }
