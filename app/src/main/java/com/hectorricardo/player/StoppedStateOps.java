@@ -23,7 +23,7 @@ class StoppedStateOps implements StateOps {
   }
 
   @Override
-  public void stop() {
+  public void pause() {
     throw new IllegalStateException("Player already stopped!");
   }
 

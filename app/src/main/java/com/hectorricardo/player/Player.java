@@ -70,7 +70,7 @@ public class Player {
   // this method caused the onPause callback to be called (99% will be yes, see the comment about
   // the slim chance above in the class's documentation). However,
   public void pause() {
-    issueCommand(stateOps::stop);
+    issueCommand(stateOps::pause);
   }
 
   public void seekTo(long millis) {
@@ -164,7 +164,7 @@ public class Player {
   interface StateOps {
     PlayingStateOps play();
 
-    void stop();
+    void pause();
 
     long getProgress();
 

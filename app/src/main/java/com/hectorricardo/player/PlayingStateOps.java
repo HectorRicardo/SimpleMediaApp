@@ -67,7 +67,7 @@ class PlayingStateOps implements StateOps {
   }
 
   @Override
-  public void stop() {
+  public void pause() {
     interruptReason = STOPPED;
     thread.interrupt();
   }
