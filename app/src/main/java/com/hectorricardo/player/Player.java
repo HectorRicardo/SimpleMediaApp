@@ -67,13 +67,6 @@ public class Player {
     stateOps = stateOps.play();
   }
 
-  // Synchronized for the same reason documented above. Also, the user could call this method to
-  // change song, but the onFinished callback is still running.
-  public synchronized void play(Song song) {
-    this.song = song;
-    stateOps = stateOps.play(song);
-  }
-
   // This methods blocks until either the background thread finishes (either by calling `onPause()`
   // or `onFinished()`.
   // I initially had the idea that this method could return a boolean indicated whether the call to
