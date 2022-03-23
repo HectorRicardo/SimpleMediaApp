@@ -1,5 +1,7 @@
 package com.hectorricardo.player;
 
+import static com.example.simplemediaapp.Songs.defaultSong;
+
 /**
  * Instances of this class simulate (in silence) the playback of a song.
  *
@@ -51,137 +53,95 @@ package com.hectorricardo.player;
  */
 public class Player {
 
-  private StateOps stateOps;
+  private final PlayerListener playerListener;
+  private Thread thread;
+  private long lastProgress = 0;
+
+  private long startedOn;
+  private Interruption interruption;
 
   public Player(PlayerListener playerListener) {
-    stateOps = new StoppedStateOps(0, this, new PlayerListenerInternal(playerListener));
+    this.playerListener = playerListener;
   }
 
-  // Synchronized because a user might call play (wrongly) when the onFinished callback is running.
-  // I say wrongly because in reality, you should wait for the onFinished callback to finish running
-  // before trying to play again.
-  public synchronized void play() {
-    stateOps = stateOps.play();
+  public void play() {
+    if (thread != null) {
+      throw new RuntimeException("Player already playing!");
+    }
+    thread =
+        new Thread(
+            () -> {
+              System.out.println("Playing " + defaultSong.id + " from " + lastProgress);
+              playerListener.onPlaybackStarted(lastProgress);
+              startedOn = System.currentTimeMillis();
+              try {
+                Thread.sleep(defaultSong.duration - lastProgress);
+                synchronized (this) {
+                  if (interruption == null) {
+                    thread = null;
+                    lastProgress = 0;
+                    playerListener.onFinished();
+                  } else {
+                    interruption.consumeAndClear();
+                  }
+                }
+              } catch (InterruptedException ignored) {
+                interruption.consumeAndClear();
+              }
+            });
+    thread.start();
   }
 
-  // This methods blocks until either the background thread finishes (either by calling `onPause()`
-  // or `onFinished()`.
-  // I initially had the idea that this method could return a boolean indicated whether the call to
-  // this method caused the onPause callback to be called (99% will be yes, see the comment about
-  // the slim chance above in the class's documentation). However,
   public void pause() {
-    issueCommand(stateOps::pause);
-  }
-
-  public void seekTo(long millis) {
-    issueCommand(() -> stateOps.seekTo(millis));
-  }
-
-  private void issueCommand(Runnable runnable) {
-    StateOps stateOps;
+    Thread thread;
     synchronized (this) {
-      stateOps = this.stateOps;
-      runnable.run();
-    }
-    // From this point onwards, it could be that `stateOps != this.stateOps`. How?
-    //
-    // If we commanded "pause" while PLAYING: Just after interrupting the thread (i.e, after
-    // the `runnable.run()` statement a few lines above), imagine that the processor switches
-    // context and passes control to the background thread (remember that threads are
-    // non-deterministic so this is quite possible). The background thread, now interrupted, runs
-    // the `onPaused()` callback, which updates `this.stateOps`. Switch back to this thread. Now,
-    // `this.stateOps` is different than it was at the beginning.
-    //
-    // If we commanded "seekTo" while PLAYING: Imagine we are seeking to the very beginning of a
-    // song. The background thread is interrupted. Context switch. The background thread handles the
-    // interruption, and runs the `onSought()` callback, which updates `stateOps` to a new
-    // `PlayingStateOps`. Context switch, and return to this thread. In that case, if we hadn't
-    // stored the original `this.stateOps` in an auxiliar variable, we would be waiting for the new
-    // PlayingStateOps, which hasn't event been sent an interrupt signal! We should instead have
-    // waited for the original stateOps.
-    //
-    // This is the reason we need an additional, auxiliary local `stateOps` variable.
-    stateOps.waitToFinish();
-  }
-
-  public synchronized long getProgress() {
-    return stateOps.getProgress();
-  }
-
-  // Most methods of this class will never interleave with the methods of the Player class (because
-  // the Player's methods are either synchronized or called from within a synchronized block). If
-  // the player is PLAYING, most methods of PlayerListenerInternal are called from within a
-  // synchronized block.
-  class PlayerListenerInternal {
-
-    private final PlayerListener userFacingPlayerListener;
-
-    private PlayerListenerInternal(PlayerListener userFacingPlayerListener) {
-      this.userFacingPlayerListener = userFacingPlayerListener;
-    }
-
-    // No need for this method to be synchronized. It doesn't modify any shared state variables.
-    // All the player command calls that interrupt the background thread won't have any effect if
-    // they interleave with these callbacks. It's impossible that any other callback happens before
-    // this callback. This is because, when this method executes, even if the interrupt signal has
-    // already been sent, it hasn't even been observed by the background thread yet.
-    void onThreadStarted(long progress, boolean sought) {
-      if (sought) {
-        userFacingPlayerListener.onSought(true, progress);
-      } else {
-        userFacingPlayerListener.onPlaybackStarted(progress);
+      if (this.thread == null) {
+        // To avoid crashing. We need to do this a no-op because otherwise, the state of the player
+        // could become PAUSED while we're waiting for the `this` lock to be received. If we take
+        // the approach of throwing an exception when pausing an already-PAUSED player, then we
+        // would also be throwing an exception on this legitimate situation.
+        return;
       }
+      interruption = new PauseInterruption();
+      thread = this.thread;
     }
-
-    Runnable onPaused(StoppedStateOps stateOps) {
-      Player.this.stateOps = stateOps;
-      return userFacingPlayerListener::onPaused;
+    try {
+      thread.join();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
-
-    void onFinished() {
-      stateOps = new StoppedStateOps(0, Player.this, this);
-      // This should be inside the synchronized block, even though it doesn't modify any shared
-      // state. Otherwise, the following super rare case could happen: while executing the
-      // `onFinished()` callback, the thread loses control and execution passes back to the main
-      // thread. We then issue from the main thread a `pause()` command (this command is valid
-      // because we already updated `stateOps` above). It's possible that the corresponding
-      // `onPaused()` callback finish its execution first before the `onFinished()` callback, which
-      // would be counter-intuitive. We ensure this doesn't happen by putting the call to the
-      // user-facing `onFinished()` callback inside the synchronized block.
-      userFacingPlayerListener.onFinished();
-    }
-
-    void onSought(StateOps stateOps, long progress) {
-      Player.this.stateOps = stateOps;
-      // If the player is PLAYING, then postpone the call to the callback until the new thread
-      // restarts. Else call callback immediately.
-      if (!stateOps.isPlaying()) {
-        userFacingPlayerListener.onSought(false, progress);
-      }
-    }
-  }
-
-  interface StateOps {
-    PlayingStateOps play();
-
-    void pause();
-
-    long getProgress();
-
-    void seekTo(long millis);
-
-    boolean isPlaying();
-
-    void waitToFinish();
+    this.thread = null;
   }
 
   public interface PlayerListener {
+
     void onPlaybackStarted(long progress);
 
-    void onPaused();
+    void onPaused(long progress);
 
     void onFinished();
+  }
 
-    void onSought(boolean playing, long progress);
+  private abstract class Interruption {
+    Interruption() {
+      thread.interrupt();
+    }
+
+    void consumeAndClear() {
+      consume();
+      interruption = null;
+    }
+
+    abstract void consume();
+  }
+
+  private class PauseInterruption extends Interruption {
+    @Override
+    void consume() {
+      lastProgress =
+          Math.min(System.currentTimeMillis() - startedOn + lastProgress, defaultSong.duration);
+      System.out.println("Paused on " + lastProgress);
+      playerListener.onPaused(lastProgress);
+    }
   }
 }

@@ -84,10 +84,10 @@ public class MediaService extends MediaBrowserServiceCompat {
             }
 
             @Override
-            public void onPaused() {
+            public void onPaused(long progress) {
               mediaSession.setPlaybackState(
                   stateBuilder
-                      .setState(STATE_PAUSED, player.getProgress(), 0)
+                      .setState(STATE_PAUSED, progress, 0)
                       .setActions(
                           ACTION_PLAY
                               | ACTION_PLAY_PAUSE
@@ -115,15 +115,16 @@ public class MediaService extends MediaBrowserServiceCompat {
               stopForeground(false);
               notificationsHandler.updateNotification();
             }
-
+            /*
             @Override
-            public void onSought(boolean playing, long progress) {
+            public void onSoughtTo(long progress, boolean playing) {
               mediaSession.setPlaybackState(
                   stateBuilder
                       .setState(playing ? STATE_PLAYING : STATE_PAUSED, progress, 1)
                       .build());
               notificationsHandler.updateNotification();
             }
+            */
           });
 
   private boolean started = false;
@@ -177,12 +178,14 @@ public class MediaService extends MediaBrowserServiceCompat {
 
         @Override
         public void onSeekTo(long pos) {
+          /*
           // Android bug
           if (mediaSession.getController().getPlaybackState().getState() == STATE_PLAYING) {
             mediaSession.setPlaybackState(stateBuilder.setState(STATE_BUFFERING, pos, 1).build());
           }
 
           player.seekTo(pos);
+           */
         }
 
         @Override
