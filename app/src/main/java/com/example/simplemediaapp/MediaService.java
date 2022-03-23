@@ -156,9 +156,9 @@ public class MediaService extends MediaBrowserServiceCompat {
         }
 
         /**
-         * This method runs when the notification is dismissed.
-         * Despite its name, this method doesn't stop the player itself. Rather, the player should
-         * be already stopped by the time this method is called. It does media session cleanup.
+         * This method runs when the notification is dismissed. Despite its name, this method
+         * doesn't stop the player itself. Rather, the player should be already stopped by the time
+         * this method is called. It does media session cleanup.
          */
         @Override
         public void onStop() {
