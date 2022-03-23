@@ -1,5 +1,7 @@
 package com.hectorricardo.player;
 
+import static com.example.simplemediaapp.Songs.defaultSong;
+
 import com.hectorricardo.player.Player.PlayerListenerInternal;
 import com.hectorricardo.player.Player.StateOps;
 
@@ -7,7 +9,6 @@ class PlayingStateOps implements StateOps {
 
   private static final int STOPPED = 0;
   private static final int PROGRESS_SET = 1;
-  private static final int SONG_SET = 2;
 
   private final Thread thread;
   private final long startingProgress;
@@ -17,12 +18,10 @@ class PlayingStateOps implements StateOps {
   private volatile Long startedOn;
 
   // Interruption reason parameters
-  private Song newSong;
   private long newProgress;
   private volatile int interruptReason;
 
   PlayingStateOps(
-      Song song,
       long startingProgress,
       boolean sought,
       Object lock,
@@ -31,11 +30,11 @@ class PlayingStateOps implements StateOps {
     thread =
         new Thread(
             () -> {
-              System.out.println("Playing " + song.id + " from " + startingProgress);
+              System.out.println("Playing " + defaultSong.id + " from " + startingProgress);
               playerListener.onThreadStarted(startingProgress, sought);
               startedOn = System.currentTimeMillis();
               try {
-                Thread.sleep(song.duration - startingProgress);
+                Thread.sleep(defaultSong.duration - startingProgress);
                 synchronized (lock) {
                   playerListener.onFinished();
                 }
@@ -46,15 +45,12 @@ class PlayingStateOps implements StateOps {
                   if (interruptReason == PROGRESS_SET) {
                     System.out.println("Progress changing");
                     playerListener.onSought(
-                        new PlayingStateOps(song, newProgress, true, lock, playerListener), newProgress);
-                  } else if (interruptReason == SONG_SET) {
-                    System.out.println("Song changing");
-                    playerListener.onSongSet(new PlayingStateOps(newSong, 0, false, lock, playerListener));
+                        new PlayingStateOps(newProgress, true, lock, playerListener), newProgress);
                   } else {
                     long newProgress = getProgress();
                     System.out.println("Paused on " + newProgress);
                     runnable = playerListener.onPaused(
-                        new StoppedStateOps(song, newProgress, lock, playerListener));
+                        new StoppedStateOps(newProgress, lock, playerListener));
                   }
                   if (runnable != null) {
                     runnable.run();
@@ -67,11 +63,6 @@ class PlayingStateOps implements StateOps {
 
   @Override
   public PlayingStateOps play() {
-    throw new IllegalStateException("Player is already playing!");
-  }
-
-  @Override
-  public PlayingStateOps play(Song song) {
     throw new IllegalStateException("Player is already playing!");
   }
 
@@ -92,13 +83,6 @@ class PlayingStateOps implements StateOps {
   public void seekTo(long millis) {
     newProgress = millis;
     interruptReason = PROGRESS_SET;
-    thread.interrupt();
-  }
-
-  @Override
-  public void changeSong(Song song) {
-    newSong = song;
-    interruptReason = SONG_SET;
     thread.interrupt();
   }
 

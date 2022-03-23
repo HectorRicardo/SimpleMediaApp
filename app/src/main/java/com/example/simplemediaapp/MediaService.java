@@ -124,9 +124,6 @@ public class MediaService extends MediaBrowserServiceCompat {
                       .build());
               notificationsHandler.updateNotification();
             }
-
-            @Override
-            public void onSongChanged() {}
           });
 
   private boolean started = false;

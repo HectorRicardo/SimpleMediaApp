@@ -1,17 +1,17 @@
 package com.hectorricardo.player;
 
+import static com.example.simplemediaapp.Songs.defaultSong;
+
 import com.hectorricardo.player.Player.PlayerListenerInternal;
 import com.hectorricardo.player.Player.StateOps;
 
 class StoppedStateOps implements StateOps {
 
-  private final Song song;
   private final long progress;
   private final Object lock;
   private final PlayerListenerInternal playerListener;
 
-  StoppedStateOps(Song song, long progress, Object lock, PlayerListenerInternal playerListener) {
-    this.song = song;
+  StoppedStateOps(long progress, Object lock, PlayerListenerInternal playerListener) {
     this.progress = progress;
     this.lock = lock;
     this.playerListener = playerListener;
@@ -19,12 +19,7 @@ class StoppedStateOps implements StateOps {
 
   @Override
   public PlayingStateOps play() {
-    return new PlayingStateOps(song, progress, false, lock, playerListener);
-  }
-
-  @Override
-  public PlayingStateOps play(Song song) {
-    return new PlayingStateOps(song, progress, false, lock, playerListener);
+    return new PlayingStateOps(progress, false, lock, playerListener);
   }
 
   @Override
@@ -38,19 +33,11 @@ class StoppedStateOps implements StateOps {
   }
 
   @Override
-  public void changeSong(Song song) {
-    playerListener.onSongSet(new StoppedStateOps(song, progress, lock, playerListener));
-  }
-
-  @Override
   public void seekTo(long progress) {
-    if (song == null) {
-      throw new IllegalStateException("No song set");
-    }
-    if (song.duration < progress) {
+    if (defaultSong.duration < progress) {
       throw new IllegalStateException("Progress can't be set for more than song's duration");
     }
-    playerListener.onSought(new StoppedStateOps(song, progress, lock, playerListener), progress);
+    playerListener.onSought(new StoppedStateOps(progress, lock, playerListener), progress);
   }
 
   @Override

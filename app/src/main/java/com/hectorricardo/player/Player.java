@@ -1,7 +1,5 @@
 package com.hectorricardo.player;
 
-import static com.example.simplemediaapp.Songs.songs;
-
 /**
  * Instances of this class simulate (in silence) the playback of a song.
  *
@@ -54,10 +52,9 @@ import static com.example.simplemediaapp.Songs.songs;
 public class Player {
 
   private StateOps stateOps;
-  private Song song = songs[0];
 
   public Player(PlayerListener playerListener) {
-    stateOps = new StoppedStateOps(song, 0, this, new PlayerListenerInternal(playerListener));
+    stateOps = new StoppedStateOps(0, this, new PlayerListenerInternal(playerListener));
   }
 
   // Synchronized because a user might call play (wrongly) when the onFinished callback is running.
@@ -142,7 +139,7 @@ public class Player {
     }
 
     void onFinished() {
-      stateOps = new StoppedStateOps(song, 0, Player.this, this);
+      stateOps = new StoppedStateOps(0, Player.this, this);
       // This should be inside the synchronized block, even though it doesn't modify any shared
       // state. Otherwise, the following super rare case could happen: while executing the
       // `onFinished()` callback, the thread loses control and execution passes back to the main
@@ -162,25 +159,16 @@ public class Player {
         userFacingPlayerListener.onSought(false, progress);
       }
     }
-
-    void onSongSet(StateOps stateOps) {
-      Player.this.stateOps = stateOps;
-      userFacingPlayerListener.onSongChanged();
-    }
   }
 
   interface StateOps {
     PlayingStateOps play();
-
-    PlayingStateOps play(Song song);
 
     void stop();
 
     long getProgress();
 
     void seekTo(long millis);
-
-    void changeSong(Song song);
 
     boolean isPlaying();
 
@@ -195,7 +183,5 @@ public class Player {
     void onFinished();
 
     void onSought(boolean playing, long progress);
-
-    void onSongChanged();
   }
 }
