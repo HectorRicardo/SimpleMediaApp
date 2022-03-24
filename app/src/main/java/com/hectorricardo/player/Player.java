@@ -14,10 +14,10 @@ public class Player {
 
   /**
    * This is synchronized because of the following hypothetical scenario: imagine the player started
-   * playing a song that lasts 5 seconds, and at the same time an additional thread that sleeps for
-   * 5.01 seconds and then issues the play command is spawned. We need to make sure that the
-   * onFinished callback finishes first than and doesn't interleave with the new play command issued
-   * from the additional thread.
+   * playing a song that lasts 5 seconds. Imagine that, at the same time, an additional thread is
+   * spawned. This additional thread sleeps for 5.01 seconds and then issues the play command. We
+   * need to make sure that the onFinished callback finishes first than and doesn't interleave with
+   * the new play command issued from the spawned thread.
    */
   public synchronized void play() {
     if (state.isPlaying()) {
@@ -32,6 +32,9 @@ public class Player {
                   try {
                     playerListener.onPlaybackStarted(state.progress);
                     Thread.sleep(defaultSong.duration);
+
+                    // Song successfully finished playing. We grab the lock while we run the
+                    // onFinished logic so we don't interleave with a potential pause command.
                     synchronized (this) {
                       state = new State(null, 0);
                       playerListener.onFinished();
@@ -54,6 +57,7 @@ public class Player {
     // See comment further below for an explanation of why we have this variable
     State state;
 
+    // Pause command issued. We grab the lock so we don't interleave with the onFinished logic.
     synchronized (this) {
       if (!this.state.isPlaying()) {
         // To avoid crashing. We need to do this a no-op because otherwise, the state of the player
