@@ -7,6 +7,7 @@ public class Player {
   private final PlayerListener playerListener;
 
   private State state = new State(null, 0);
+  private Interruption interruption;
 
   public Player(PlayerListener playerListener) {
     this.playerListener = playerListener;
@@ -42,13 +43,7 @@ public class Player {
                         break;
                       }
                     } catch (InterruptedException ignored) {
-                      state =
-                          new State(
-                              null,
-                              Math.min(
-                                  System.currentTimeMillis() - startedOn + state.progress,
-                                  defaultSong.duration));
-                      playerListener.onPaused(state.progress);
+                      interruption.consumeAndClear(startedOn);
                       break;
                     }
                   } while (true);
@@ -71,6 +66,8 @@ public class Player {
         return;
       }
       state = this.state;
+
+      interruption = new PauseInterruption();
       state.thread.interrupt();
     }
     // It could be that `this.state` was updated after we exited the synchronized block above but
@@ -87,6 +84,10 @@ public class Player {
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public synchronized void seekTo(long progress) {
+
   }
 
   public interface PlayerListener {
@@ -109,6 +110,28 @@ public class Player {
 
     boolean isPlaying() {
       return thread != null;
+    }
+  }
+
+  private abstract class Interruption {
+    void consumeAndClear(long startedOn) {
+      consume(startedOn);
+      interruption = null;
+    }
+
+    abstract void consume(long startedOn);
+  }
+
+  private class PauseInterruption extends Interruption {
+    @Override
+    void consume(long startedOn) {
+      state =
+          new State(
+              null,
+              Math.min(
+                  System.currentTimeMillis() - startedOn + state.progress, defaultSong.duration));
+      System.out.println("Paused on " + state.progress);
+      playerListener.onPaused(state.progress);
     }
   }
 }
