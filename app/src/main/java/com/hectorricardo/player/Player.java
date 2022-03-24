@@ -35,13 +35,13 @@ public class Player {
       System.out.println("Playing " + defaultSong.id + " from " + state.progress);
       long startedOn = System.currentTimeMillis();
       try {
+        //noinspection BusyWait
         Thread.sleep(defaultSong.duration - state.progress);
 
         // Song successfully finished playing. We grab the lock while we run the
         // onFinished logic so we don't interleave with a potential pause command.
         synchronized (this) {
-          state = new State(null, 0);
-          playerListener.onFinished();
+          onFinished();
           break;
         }
       } catch (InterruptedException ignored) {
@@ -50,6 +50,12 @@ public class Player {
         }
       }
     } while (true);
+  }
+
+  private void onFinished() {
+    state = new State(null, 0);
+    System.out.println("Song finished");
+    playerListener.onFinished();
   }
 
   public void pause() {
@@ -159,14 +165,18 @@ public class Player {
     }
 
     @Override
-    boolean consume(long startedOn) {
-      state = new State(state.thread, progress);
-      System.out.println("Seeking to " + progress);
-      playerListener.onSoughtTo(state.progress, true);
+    boolean consume(long ignored) {
+      if (progress < defaultSong.duration) {
+        System.out.println("Seeking to " + progress);
+        state = new State(state.thread, progress);
+        playerListener.onSoughtTo(progress, true);
+      } else {
+        onFinished();
+      }
       synchronized (Player.this) {
         Player.this.notifyAll();
       }
-      return true;
+      return progress < defaultSong.duration;
     }
   }
 }
