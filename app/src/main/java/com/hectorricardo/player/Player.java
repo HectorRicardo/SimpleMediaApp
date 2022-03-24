@@ -51,7 +51,9 @@ public class Player {
   }
 
   public void pause() {
+    // See comment further below for an explanation of why we have this variable
     State state;
+
     synchronized (this) {
       if (!this.state.isPlaying()) {
         // To avoid crashing. We need to do this a no-op because otherwise, the state of the player
@@ -65,7 +67,7 @@ public class Player {
     }
     // It could be that `this.state` was updated after we exited the synchronized block above but
     // before executing the following statement. For this scenario, we use the auxiliary local
-    // variable `state` to make sure we wait against the original `state`.
+    // variable `state` to make sure we wait against the original `state.thread`.
     //
     // How could `this.state` change?
     //
