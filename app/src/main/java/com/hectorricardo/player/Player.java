@@ -31,7 +31,7 @@ public class Player {
                   long startedOn = System.currentTimeMillis();
                   try {
                     playerListener.onPlaybackStarted(state.progress);
-                    Thread.sleep(defaultSong.duration);
+                    Thread.sleep(defaultSong.duration - state.progress);
 
                     // Song successfully finished playing. We grab the lock while we run the
                     // onFinished logic so we don't interleave with a potential pause command.
