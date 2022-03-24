@@ -126,6 +126,9 @@ public class Player {
           // left pending, and the next time the player starts, it is paused immediately).
           //
           // So it follows that we need to account for the paranoid interruption here
+          //
+          // NOTE: the interruption consumption can be executed outside of the synchronized block,
+          // but for elegance purposes, I'll leave it inside.
           keepAlive = interruption == null ? onFinished() : interruption.consumeAndClear(startedOn);
         }
       } catch (InterruptedException ignored) {
