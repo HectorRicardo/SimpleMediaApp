@@ -115,7 +115,7 @@ public class MediaService extends MediaBrowserServiceCompat {
               stopForeground(false);
               notificationsHandler.updateNotification();
             }
-            /*
+
             @Override
             public void onSoughtTo(long progress, boolean playing) {
               mediaSession.setPlaybackState(
@@ -124,7 +124,6 @@ public class MediaService extends MediaBrowserServiceCompat {
                       .build());
               notificationsHandler.updateNotification();
             }
-            */
           });
 
   private boolean started = false;
@@ -178,14 +177,12 @@ public class MediaService extends MediaBrowserServiceCompat {
 
         @Override
         public void onSeekTo(long pos) {
-          /*
           // Android bug
           if (mediaSession.getController().getPlaybackState().getState() == STATE_PLAYING) {
             mediaSession.setPlaybackState(stateBuilder.setState(STATE_BUFFERING, pos, 1).build());
           }
 
           player.seekTo(pos);
-           */
         }
 
         @Override

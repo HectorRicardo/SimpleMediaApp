@@ -28,11 +28,12 @@ public class Player {
         new State(
             new Thread(
                 () -> {
+                  playerListener.onPlaybackStarted(state.progress);
+
                   do {
                     System.out.println("Playing " + defaultSong.id + " from " + state.progress);
                     long startedOn = System.currentTimeMillis();
                     try {
-                      playerListener.onPlaybackStarted(state.progress);
                       Thread.sleep(defaultSong.duration - state.progress);
 
                       // Song successfully finished playing. We grab the lock while we run the
@@ -43,8 +44,9 @@ public class Player {
                         break;
                       }
                     } catch (InterruptedException ignored) {
-                      interruption.consumeAndClear(startedOn);
-                      break;
+                      if (!interruption.consumeAndClear(startedOn)) {
+                        break;
+                      }
                     }
                   } while (true);
                 }),
@@ -87,7 +89,20 @@ public class Player {
   }
 
   public synchronized void seekTo(long progress) {
+    if (!this.state.isPlaying()) {
+      state = new State(null, progress);
+      playerListener.onSoughtTo(progress, false);
+      return;
+    }
 
+    interruption = new SeekToInterruption(progress);
+    state.thread.interrupt();
+
+    try {
+      wait();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public interface PlayerListener {
@@ -95,6 +110,8 @@ public class Player {
     void onPlaybackStarted(long progress);
 
     void onPaused(long progress);
+
+    void onSoughtTo(long progress, boolean playing);
 
     void onFinished();
   }
@@ -114,17 +131,17 @@ public class Player {
   }
 
   private abstract class Interruption {
-    void consumeAndClear(long startedOn) {
-      consume(startedOn);
+    boolean consumeAndClear(long startedOn) {
       interruption = null;
+      return consume(startedOn);
     }
 
-    abstract void consume(long startedOn);
+    abstract boolean consume(long startedOn);
   }
 
   private class PauseInterruption extends Interruption {
     @Override
-    void consume(long startedOn) {
+    boolean consume(long startedOn) {
       state =
           new State(
               null,
@@ -132,6 +149,26 @@ public class Player {
                   System.currentTimeMillis() - startedOn + state.progress, defaultSong.duration));
       System.out.println("Paused on " + state.progress);
       playerListener.onPaused(state.progress);
+      return false;
+    }
+  }
+
+  private class SeekToInterruption extends Interruption {
+    private final long progress;
+
+    SeekToInterruption(long progress) {
+      this.progress = progress;
+    }
+
+    @Override
+    boolean consume(long startedOn) {
+      state = new State(state.thread, progress);
+      System.out.println("Seeking to " + progress);
+      playerListener.onSoughtTo(state.progress, true);
+      synchronized (Player.this) {
+        Player.this.notifyAll();
+      }
+      return true;
     }
   }
 }
