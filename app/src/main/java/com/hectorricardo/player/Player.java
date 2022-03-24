@@ -12,6 +12,13 @@ public class Player {
     this.playerListener = playerListener;
   }
 
+  /**
+   * This is synchronized because of the following hypothetical scenario: imagine the player started
+   * playing a song that lasts 5 seconds, and at the same time an additional thread that sleeps for
+   * 5.01 seconds and then issues the play command is spawned. We need to make sure that the
+   * onFinished callback finishes first than and doesn't interleave with the new play command issued
+   * from the additional thread.
+   */
   public synchronized void play() {
     if (state.isPlaying()) {
       throw new RuntimeException("Player already playing!");
@@ -56,6 +63,15 @@ public class Player {
       state = this.state;
       state.thread.interrupt();
     }
+    // It could be that `this.state` was updated after we exited the synchronized block above but
+    // before executing the following statement. For this scenario, we use the auxiliary local
+    // variable `state` to make sure we wait against the original `state`.
+    //
+    // How could `this.state` change?
+    //
+    // When executing `state.thread.interrupt()` above, it could be that there's a context switch
+    // and the interruption catch clause is immediately executed. This causes `this.state.thread` to
+    // become null, and we would be encountering a NullPointerException below.
     try {
       state.thread.join();
     } catch (InterruptedException e) {
