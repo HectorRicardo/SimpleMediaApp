@@ -34,6 +34,7 @@ import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.RatingCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -102,6 +103,8 @@ public class MediaService extends MediaBrowserServiceCompat {
 
             @Override
             public void onFinished() {
+              Log.d("HAPPY", "onFinished ");
+
               mediaSession.setPlaybackState(
                   stateBuilder
                       .setState(STATE_STOPPED, 0, 1)
@@ -118,6 +121,7 @@ public class MediaService extends MediaBrowserServiceCompat {
 
             @Override
             public void onSoughtTo(long progress, boolean playing) {
+              Log.d("HAPPY", "onSoughtTo " + progress);
               mediaSession.setPlaybackState(
                   stateBuilder
                       .setState(playing ? STATE_PLAYING : STATE_PAUSED, progress, 1)

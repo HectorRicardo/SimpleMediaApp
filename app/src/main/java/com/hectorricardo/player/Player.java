@@ -24,34 +24,32 @@ public class Player {
     if (state.isPlaying()) {
       throw new RuntimeException("Player already playing!");
     }
-    state =
-        new State(
-            new Thread(
-                () -> {
-                  playerListener.onPlaybackStarted(state.progress);
-
-                  do {
-                    System.out.println("Playing " + defaultSong.id + " from " + state.progress);
-                    long startedOn = System.currentTimeMillis();
-                    try {
-                      Thread.sleep(defaultSong.duration - state.progress);
-
-                      // Song successfully finished playing. We grab the lock while we run the
-                      // onFinished logic so we don't interleave with a potential pause command.
-                      synchronized (this) {
-                        state = new State(null, 0);
-                        playerListener.onFinished();
-                        break;
-                      }
-                    } catch (InterruptedException ignored) {
-                      if (!interruption.consumeAndClear(startedOn)) {
-                        break;
-                      }
-                    }
-                  } while (true);
-                }),
-            state.progress);
+    state = new State(new Thread(this::run), state.progress);
     state.thread.start();
+  }
+
+  private void run() {
+    playerListener.onPlaybackStarted(state.progress);
+
+    do {
+      System.out.println("Playing " + defaultSong.id + " from " + state.progress);
+      long startedOn = System.currentTimeMillis();
+      try {
+        Thread.sleep(defaultSong.duration - state.progress);
+
+        // Song successfully finished playing. We grab the lock while we run the
+        // onFinished logic so we don't interleave with a potential pause command.
+        synchronized (this) {
+          state = new State(null, 0);
+          playerListener.onFinished();
+          break;
+        }
+      } catch (InterruptedException ignored) {
+        if (!interruption.consumeAndClear(startedOn)) {
+          break;
+        }
+      }
+    } while (true);
   }
 
   public void pause() {
