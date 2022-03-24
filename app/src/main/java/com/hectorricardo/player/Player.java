@@ -27,27 +27,31 @@ public class Player {
         new State(
             new Thread(
                 () -> {
-                  System.out.println("Playing " + defaultSong.id + " from " + state.progress);
-                  long startedOn = System.currentTimeMillis();
-                  try {
-                    playerListener.onPlaybackStarted(state.progress);
-                    Thread.sleep(defaultSong.duration - state.progress);
+                  do {
+                    System.out.println("Playing " + defaultSong.id + " from " + state.progress);
+                    long startedOn = System.currentTimeMillis();
+                    try {
+                      playerListener.onPlaybackStarted(state.progress);
+                      Thread.sleep(defaultSong.duration - state.progress);
 
-                    // Song successfully finished playing. We grab the lock while we run the
-                    // onFinished logic so we don't interleave with a potential pause command.
-                    synchronized (this) {
-                      state = new State(null, 0);
-                      playerListener.onFinished();
+                      // Song successfully finished playing. We grab the lock while we run the
+                      // onFinished logic so we don't interleave with a potential pause command.
+                      synchronized (this) {
+                        state = new State(null, 0);
+                        playerListener.onFinished();
+                        break;
+                      }
+                    } catch (InterruptedException ignored) {
+                      state =
+                          new State(
+                              null,
+                              Math.min(
+                                  System.currentTimeMillis() - startedOn + state.progress,
+                                  defaultSong.duration));
+                      playerListener.onPaused(state.progress);
+                      break;
                     }
-                  } catch (InterruptedException ignored) {
-                    state =
-                        new State(
-                            null,
-                            Math.min(
-                                System.currentTimeMillis() - startedOn + state.progress,
-                                defaultSong.duration));
-                    playerListener.onPaused(state.progress);
-                  }
+                  } while (true);
                 }),
             state.progress);
     state.thread.start();
