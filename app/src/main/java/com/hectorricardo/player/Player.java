@@ -6,17 +6,16 @@ public class Player {
 
   private final PlayerListener playerListener;
 
-  private volatile State state = new State(null, 0);
+  private State state = new State(null, 0);
 
   public Player(PlayerListener playerListener) {
     this.playerListener = playerListener;
   }
 
-  public void play() {
+  public synchronized void play() {
     if (state.isPlaying()) {
       throw new RuntimeException("Player already playing!");
     }
-    //noinspection NonAtomicOperationOnVolatileField
     state =
         new State(
             new Thread(
@@ -31,7 +30,6 @@ public class Player {
                       playerListener.onFinished();
                     }
                   } catch (InterruptedException ignored) {
-                    //noinspection NonAtomicOperationOnVolatileField
                     state =
                         new State(
                             null,
