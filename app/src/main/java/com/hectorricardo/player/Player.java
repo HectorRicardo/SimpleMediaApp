@@ -8,6 +8,10 @@ public class Player {
     this.playerListener = playerListener;
   }
 
+  public void play() {}
+
+  public void pause() {}
+
   public interface PlayerListener {
 
     void onPlaybackStarted(long progress);
