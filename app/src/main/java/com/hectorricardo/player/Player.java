@@ -32,11 +32,13 @@ public class Player {
     }
   }
 
-  public synchronized void play(Song song) {
-    issueCommand(() -> {
-      state = new State(song, new Thread(this::run), 0);
-      state.thread.start();
-    }, () -> new SongSetInterruption(song));
+  public void play(Song song) {
+    issueCommand(
+        () -> {
+          state = new State(song, new Thread(this::run), 0);
+          state.thread.start();
+        },
+        () -> new SongSetInterruption(song));
   }
 
   public void pause() {
@@ -147,6 +149,8 @@ public class Player {
 
     void onSoughtTo(long progress, boolean playing);
 
+    void onSongChanged();
+
     void onFinished();
   }
 
@@ -203,16 +207,13 @@ public class Player {
 
     @Override
     boolean consume(long ignored) {
-      boolean keepAlive;
-      if (progress < state.song.duration) {
-        System.out.println("Seeking to " + progress);
-        state = new State(state.song, state.thread, progress);
-        playerListener.onSoughtTo(progress, true);
-        keepAlive = true;
-      } else {
-        keepAlive = onFinished();
+      if (progress >= state.song.duration) {
+        return onFinished();
       }
-      return keepAlive;
+      System.out.println("Seeking to " + progress);
+      state = new State(state.song, state.thread, progress);
+      playerListener.onSoughtTo(progress, true);
+      return true;
     }
   }
 
@@ -227,7 +228,7 @@ public class Player {
     boolean consume(long ignored) {
       System.out.println("Playing song " + song.id);
       state = new State(song, state.thread, 0);
-      playerListener.onPlaybackStarted(0);
+      playerListener.onSongChanged();
       return true;
     }
   }

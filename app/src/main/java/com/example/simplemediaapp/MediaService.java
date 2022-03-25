@@ -70,17 +70,7 @@ public class MediaService extends MediaBrowserServiceCompat {
           new PlayerListener() {
             @Override
             public void onPlaybackStarted(long progress) {
-              mediaSession.setPlaybackState(
-                  stateBuilder
-                      .setState(STATE_PLAYING, progress, 1)
-                      .setActions(
-                          ACTION_PAUSE
-                              | ACTION_PLAY_PAUSE
-                              | ACTION_STOP
-                              | ACTION_SKIP_TO_NEXT
-                              | ACTION_SKIP_TO_PREVIOUS
-                              | ACTION_SEEK_TO)
-                      .build());
+              setStateToPlaying(progress);
               startForeground(NOTIFICATION_ID, notificationsHandler.createNotification());
             }
 
@@ -126,6 +116,26 @@ public class MediaService extends MediaBrowserServiceCompat {
                   stateBuilder
                       .setState(playing ? STATE_PLAYING : STATE_PAUSED, progress, 1)
                       .build());
+              notificationsHandler.updateNotification();
+            }
+
+            private void setStateToPlaying(long progress) {
+              mediaSession.setPlaybackState(
+                  stateBuilder
+                      .setState(STATE_PLAYING, progress, 1)
+                      .setActions(
+                          ACTION_PAUSE
+                              | ACTION_PLAY_PAUSE
+                              | ACTION_STOP
+                              | ACTION_SKIP_TO_NEXT
+                              | ACTION_SKIP_TO_PREVIOUS
+                              | ACTION_SEEK_TO)
+                      .build());
+            }
+
+            @Override
+            public void onSongChanged() {
+              setStateToPlaying(0);
               notificationsHandler.updateNotification();
             }
           });
