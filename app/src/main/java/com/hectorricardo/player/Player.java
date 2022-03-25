@@ -33,8 +33,10 @@ public class Player {
   }
 
   public synchronized void play(Song song) {
-    state = new State(song, new Thread(this::run), 0);
-    state.thread.start();
+    issueCommand(() -> {
+      state = new State(song, new Thread(this::run), 0);
+      state.thread.start();
+    }, () -> new SongSetInterruption(song));
   }
 
   public void pause() {
@@ -56,8 +58,10 @@ public class Player {
 
   private synchronized void issueCommand(
       Runnable onPaused, Supplier<Interruption> interruptionSupplier) {
-    if (!state.isPlaying()) {
-      if (onPaused != null) onPaused.run();
+    if (state == null || !state.isPlaying()) {
+      if (onPaused != null) {
+        onPaused.run();
+      }
       return;
     }
 
