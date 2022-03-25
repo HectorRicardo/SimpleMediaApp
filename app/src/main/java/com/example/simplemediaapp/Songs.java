@@ -8,9 +8,10 @@ public class Songs {
 
   public static final Song[] songs =
       new Song[] {
-        new Song("furElise", "Für Elise", "Ludwig van Beethoven", 10000),
+        new Song("furElise", "Für Elise", "Ludwig van Beethoven", 3000),
         new Song("myWay", "My Way", "Frank Sinatra", 20000),
         new Song("mariageDamour", "Mariage d'Amour", "Paul de Senneville", 40000),
+        new Song("rondoAllaTurca", "Turkish March", "Wolfgang Amadeus Mozart", 150000),
       };
 
   private static final Map<String, Integer> songsMap = new HashMap<>(songs.length);
