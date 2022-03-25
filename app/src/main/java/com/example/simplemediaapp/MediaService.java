@@ -152,6 +152,14 @@ public class MediaService extends MediaBrowserServiceCompat {
           if (songSet) {
             player.play();
           } else {
+            Song song = songs[0];
+            mediaSession.setMetadata(
+                metadataBuilder
+                    .putString(METADATA_KEY_TITLE, song.title)
+                    .putString(METADATA_KEY_ARTIST, song.artist)
+                    .putLong(METADATA_KEY_DURATION, song.duration)
+                    .build());
+            notificationsHandler.updateSong();
             player.play(songs[0]);
             songSet = true;
           }
@@ -208,12 +216,8 @@ public class MediaService extends MediaBrowserServiceCompat {
 
     mediaSession = new MediaSessionCompat(this, "MyAppService");
     mediaSession.setPlaybackState(stateBuilder.setActions(ACTION_PLAY | ACTION_PLAY_PAUSE).build());
-    Song song = songs[0];
     mediaSession.setMetadata(
         metadataBuilder
-            .putString(METADATA_KEY_TITLE, song.title)
-            .putString(METADATA_KEY_ARTIST, song.artist)
-            .putLong(METADATA_KEY_DURATION, song.duration)
             .putRating(METADATA_KEY_RATING, newUnratedRating(RATING_THUMB_UP_DOWN))
             .putBitmap(
                 METADATA_KEY_ART,
@@ -224,7 +228,6 @@ public class MediaService extends MediaBrowserServiceCompat {
     setSessionToken(mediaSession.getSessionToken());
 
     notificationsHandler = new NotificationHandler(this, mediaSession);
-    notificationsHandler.setSong();
   }
 
   @Override

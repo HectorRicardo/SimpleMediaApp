@@ -115,7 +115,7 @@ public class NotificationHandler {
                 .build());
   }
 
-  public void setSong() {
+  public void updateSong() {
     MediaDescriptionCompat mediaDescription = getMetadata().getDescription();
     notificationBuilder
         .setContentTitle(mediaDescription.getTitle())
@@ -124,7 +124,7 @@ public class NotificationHandler {
   }
 
   public void onLocaleChanged() {
-    setSong();
+    updateSong();
     defineActions();
     updateNotification();
   }
