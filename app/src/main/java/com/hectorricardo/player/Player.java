@@ -4,9 +4,11 @@ import androidx.core.util.Supplier;
 
 public class Player {
 
+  private static final State INITIAL_STATE = new State(null, null, 0);
+
   private final PlayerListener playerListener;
 
-  private State state = null;
+  private State state = INITIAL_STATE;
   private Interruption interruption;
 
   public Player(PlayerListener playerListener) {
@@ -67,7 +69,7 @@ public class Player {
     // This method is synchronized because it can get into a race condition with the critical
     // section located just after the `Thread.sleep()` call in the player thread. In other words, a
     // command can compete against the end-of-song logic.
-    if (state == null || !state.isPlaying()) {
+    if (!state.isPlaying()) {
       if (onPaused != null) {
         onPaused.run();
       }
@@ -128,7 +130,11 @@ public class Player {
           // So it follows that we need to account for the paranoid interruption here
           //
           // NOTE: the interruption consumption can be executed outside of the synchronized block,
-          // but for elegance purposes, I'll leave it inside.
+          // but for elegance purposes, I'll leave it inside. On the other hand, in order to enfore
+          // happens-before guarantee, the onfinished callback must be inside the sync block. If it
+          // werent, then a competing pending command that losed the race could take over, and if
+          // we're unlucky, its corresponding onPause command could execute and finish earlier than
+          // this onFinished callback.
           keepAlive = interruption == null ? onFinished() : interruption.consumeAndClear(startedOn);
         }
       } catch (InterruptedException ignored) {
@@ -142,10 +148,10 @@ public class Player {
   }
 
   private boolean onFinished() {
-    state = new State(state.song, null, 0);
     System.out.println("Song finished");
-    playerListener.onFinished();
-    return false;
+    Song nextSong = playerListener.onFinished();
+    state = nextSong == null ? INITIAL_STATE : new State(nextSong, state.thread, 0);
+    return nextSong != null;
   }
 
   public interface PlayerListener {
@@ -158,7 +164,7 @@ public class Player {
 
     void onSongChanged();
 
-    void onFinished();
+    Song onFinished();
   }
 
   private static class State {

@@ -92,21 +92,27 @@ public class MediaService extends MediaBrowserServiceCompat {
             }
 
             @Override
-            public void onFinished() {
-              Log.d("HAPPY", "onFinished ");
-
-              mediaSession.setPlaybackState(
-                  stateBuilder
-                      .setState(STATE_STOPPED, 0, 1)
-                      .setActions(
-                          ACTION_PLAY
-                              | ACTION_PLAY_PAUSE
-                              | ACTION_SKIP_TO_NEXT
-                              | ACTION_SKIP_TO_PREVIOUS
-                              | ACTION_SEEK_TO)
-                      .build());
-              stopForeground(false);
+            public Song onFinished() {
+              boolean keepPlaying = songIdx < songs.length - 1;
+              if (keepPlaying) {
+                setSong(songIdx + 1);
+                setStateToPlaying(0);
+              } else {
+                setSong(0);
+                mediaSession.setPlaybackState(
+                    stateBuilder
+                        .setState(STATE_STOPPED, 0, 1)
+                        .setActions(
+                            ACTION_PLAY
+                                | ACTION_PLAY_PAUSE
+                                | ACTION_SKIP_TO_NEXT
+                                | ACTION_SKIP_TO_PREVIOUS
+                                | ACTION_SEEK_TO)
+                        .build());
+                stopForeground(false);
+              }
               notificationsHandler.updateNotification();
+              return keepPlaying ? songs[songIdx] : null;
             }
 
             @Override
@@ -167,16 +173,8 @@ public class MediaService extends MediaBrowserServiceCompat {
         }
 
         private void playSong(int songIdx) {
-          MediaService.this.songIdx = songIdx;
-          Song song = songs[songIdx];
-          mediaSession.setMetadata(
-              metadataBuilder
-                  .putString(METADATA_KEY_TITLE, song.title)
-                  .putString(METADATA_KEY_ARTIST, song.artist)
-                  .putLong(METADATA_KEY_DURATION, song.duration)
-                  .build());
-          notificationsHandler.updateSong();
-          player.play(song);
+          setSong(songIdx);
+          player.play(songs[songIdx]);
         }
 
         @Override
@@ -225,6 +223,18 @@ public class MediaService extends MediaBrowserServiceCompat {
           notificationsHandler.setRatingAndUpdate();
         }
       };
+
+  private void setSong(int songIdx) {
+    this.songIdx = songIdx;
+    Song song = songs[songIdx];
+    mediaSession.setMetadata(
+        metadataBuilder
+            .putString(METADATA_KEY_TITLE, song.title)
+            .putString(METADATA_KEY_ARTIST, song.artist)
+            .putLong(METADATA_KEY_DURATION, song.duration)
+            .build());
+    notificationsHandler.updateSong();
+  }
 
   @Override
   public void onCreate() {
