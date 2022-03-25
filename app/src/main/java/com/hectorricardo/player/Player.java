@@ -42,10 +42,14 @@ public class Player {
   }
 
   public void pause() {
-    // To avoid crashing. We need to do this a no-op because otherwise, the state of the player
-    // could become PAUSED while we're waiting for the `this` lock to be granted. If we take
-    // the approach of throwing an exception when pausing an already-PAUSED player, then we
-    // would also be throwing an exception on this legitimate situation.
+    // The pause command can compete against the 'after-sleep' logic of the player thread. If this
+    // latter logic determines that the player should stop, then when this pause command method
+    // takes over, the player will be in a stopped state. In any other normal situation, we would
+    // throw an IllegalStateException if we tried to pause a player that is already paused, but
+    // because of this possible state due to concurrency races, we can't afford to do that. We need
+    // to make the pause a no-op in case the player is already paused in order to avoid throwing an
+    // exception in this legitimate situation. The no-op is represented by the `null` in the first
+    // argument.
     issueCommand(null, PauseInterruption::new);
   }
 
@@ -60,6 +64,9 @@ public class Player {
 
   private synchronized void issueCommand(
       Runnable onPaused, Supplier<Interruption> interruptionSupplier) {
+    // This method is synchronized because it can get into a race condition with the critical
+    // section located just after the `Thread.sleep()` call in the player thread. In other words, a
+    // command can compete against the end-of-song logic.
     if (state == null || !state.isPlaying()) {
       if (onPaused != null) {
         onPaused.run();
