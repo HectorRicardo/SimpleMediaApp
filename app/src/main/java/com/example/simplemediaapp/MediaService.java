@@ -131,6 +131,7 @@ public class MediaService extends MediaBrowserServiceCompat {
           });
 
   private boolean started = false;
+  private boolean songSet = false;
   private final MediaSessionCompat.Callback mediaSessionCallback =
       new MediaSessionCompat.Callback() {
 
@@ -148,7 +149,12 @@ public class MediaService extends MediaBrowserServiceCompat {
         @Override
         public void onPlay() {
           prepareForPlayback();
-          player.play();
+          if (songSet) {
+            player.play();
+          } else {
+            player.play(songs[0]);
+            songSet = true;
+          }
         }
 
         @Override

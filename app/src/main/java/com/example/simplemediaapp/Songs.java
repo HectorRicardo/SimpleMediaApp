@@ -13,8 +13,6 @@ public class Songs {
         new Song("mariageDamour", "Mariage d'Amour", "Paul de Senneville", 40000),
       };
 
-  public static final Song defaultSong = songs[0];
-
   private static final Map<String, Integer> songsMap = new HashMap<>(songs.length);
 
   static {

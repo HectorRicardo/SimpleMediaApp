@@ -1,12 +1,10 @@
 package com.hectorricardo.player;
 
-import static com.example.simplemediaapp.Songs.defaultSong;
-
 public class Player {
 
   private final PlayerListener playerListener;
 
-  private State state = new State(defaultSong, null, 0);
+  private State state = null;
   private Interruption interruption;
 
   public Player(PlayerListener playerListener) {
@@ -30,6 +28,11 @@ public class Player {
       state = new State(state.song, null, 0);
       playerListener.onFinished();
     }
+  }
+
+  public synchronized void play(Song song) {
+    state = new State(song, new Thread(this::run), 0);
+    state.thread.start();
   }
 
   public void pause() {
