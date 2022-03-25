@@ -6,7 +6,7 @@ public class Player {
 
   private final PlayerListener playerListener;
 
-  private State state = new State(null, 0);
+  private State state = new State(defaultSong, null, 0);
   private Interruption interruption;
 
   public Player(PlayerListener playerListener) {
@@ -23,11 +23,11 @@ public class Player {
     if (state.isPlaying()) {
       throw new RuntimeException("Player already playing!");
     }
-    if (state.progress < defaultSong.duration) {
-      state = new State(new Thread(this::run), state.progress);
+    if (state.progress < state.song.duration) {
+      state = new State(state.song, new Thread(this::run), state.progress);
       state.thread.start();
     } else {
-      state = new State(null, 0);
+      state = new State(state.song, null, 0);
       playerListener.onFinished();
     }
   }
@@ -69,7 +69,7 @@ public class Player {
 
   public synchronized void seekTo(long progress) {
     if (!state.isPlaying()) {
-      state = new State(null, progress);
+      state = new State(state.song, null, progress);
       playerListener.onSoughtTo(progress, false);
       return;
     }
@@ -99,10 +99,10 @@ public class Player {
     boolean keepAlive;
     playerListener.onPlaybackStarted(state.progress);
     do {
-      System.out.println("Playing " + defaultSong.id + " from " + state.progress);
+      System.out.println("Playing " + state.song.id + " from " + state.progress);
       long startedOn = System.currentTimeMillis();
       try {
-        Thread.sleep(defaultSong.duration - state.progress);
+        Thread.sleep(state.song.duration - state.progress);
 
         synchronized (this) {
           // Song successfully finished playing. There are two possible paths:
@@ -142,7 +142,7 @@ public class Player {
   }
 
   private boolean onFinished() {
-    state = new State(null, 0);
+    state = new State(state.song, null, 0);
     System.out.println("Song finished");
     playerListener.onFinished();
     return false;
@@ -160,10 +160,12 @@ public class Player {
   }
 
   private static class State {
+    final Song song;
     final Thread thread;
     final long progress;
 
-    State(Thread thread, long progress) {
+    State(Song song, Thread thread, long progress) {
+      this.song = song;
       this.thread = thread;
       this.progress = progress;
     }
@@ -187,9 +189,10 @@ public class Player {
     boolean consume(long startedOn) {
       state =
           new State(
+              state.song,
               null,
               Math.min(
-                  System.currentTimeMillis() - startedOn + state.progress, defaultSong.duration));
+                  System.currentTimeMillis() - startedOn + state.progress, state.song.duration));
       System.out.println("Paused on " + state.progress);
       playerListener.onPaused(state.progress);
       return false;
@@ -206,9 +209,9 @@ public class Player {
     @Override
     boolean consume(long ignored) {
       boolean keepAlive;
-      if (progress < defaultSong.duration) {
+      if (progress < state.song.duration) {
         System.out.println("Seeking to " + progress);
-        state = new State(state.thread, progress);
+        state = new State(state.song, state.thread, progress);
         playerListener.onSoughtTo(progress, true);
         keepAlive = true;
       } else {
