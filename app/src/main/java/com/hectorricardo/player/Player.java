@@ -1,5 +1,7 @@
 package com.hectorricardo.player;
 
+import androidx.core.util.Supplier;
+
 public class Player {
 
   private final PlayerListener playerListener;
@@ -36,57 +38,39 @@ public class Player {
   }
 
   public void pause() {
-    // See comment further below for an explanation of why we have this variable
-    State state;
-
-    // Pause command issued. We grab the lock so we don't interleave with the onFinished logic.
-    synchronized (this) {
-      if (!this.state.isPlaying()) {
-        // To avoid crashing. We need to do this a no-op because otherwise, the state of the player
-        // could become PAUSED while we're waiting for the `this` lock to be granted. If we take
-        // the approach of throwing an exception when pausing an already-PAUSED player, then we
-        // would also be throwing an exception on this legitimate situation.
-        return;
-      }
-      state = this.state;
-
-      interruption = new PauseInterruption();
-      state.thread.interrupt();
-    }
-    // It could be that `this.state` was updated after we exited the synchronized block above but
-    // before executing the following statements. That's why we used the auxiliary local variable
-    // `state` to make sure we wait against the original `state.thread`.
-    //
-    // How could `this.state` change?
-    //
-    // When executing `state.thread.interrupt()` above, it could be that there's a context switch
-    // immediately and the interruption catch clause is immediately executed. This causes
-    // `this.state.thread` to become null, and we would be encountering a NullPointerException
-    // below.
-    try {
-      state.thread.join();
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
+    // To avoid crashing. We need to do this a no-op because otherwise, the state of the player
+    // could become PAUSED while we're waiting for the `this` lock to be granted. If we take
+    // the approach of throwing an exception when pausing an already-PAUSED player, then we
+    // would also be throwing an exception on this legitimate situation.
+    issueCommand(null, PauseInterruption::new);
   }
 
-  public synchronized void seekTo(long progress) {
+  public void seekTo(long progress) {
+    issueCommand(
+        () -> {
+          state = new State(state.song, null, progress);
+          playerListener.onSoughtTo(progress, false);
+        },
+        () -> new SeekToInterruption(progress));
+  }
+
+  private synchronized void issueCommand(
+      Runnable onPaused, Supplier<Interruption> interruptionSupplier) {
     if (!state.isPlaying()) {
-      state = new State(state.song, null, progress);
-      playerListener.onSoughtTo(progress, false);
+      if (onPaused != null) onPaused.run();
       return;
     }
 
     State state = this.state;
-    interruption = new SeekToInterruption(progress);
+    interruption = interruptionSupplier.get();
     state.thread.interrupt();
 
     // After executing the above `state.thread.interrupt()`, it could be that there's a context
     // switch immediately and the interruption catch clause is immediately executed. This generates
     // a new state and assigns it to the `this.state` property. But it could also be that this
     // situation doesn't happen. So that's why we stored the original state (before the interrupt)
-    // in an homonymous local variable. Whenever this two variables aren't equal anymore, we know
-    // the interruption was handled, so we unblock.
+    // in an homonymous auxiliary local variable. Whenever this two variables aren't equal anymore,
+    // we know the interruption was handled, so we unblock.
     //
     // We use a `while` instead of an `if` because of spurious wake-ups.
     while (state == this.state) {
@@ -151,10 +135,6 @@ public class Player {
     return false;
   }
 
-  private synchronized void wakeUpMainThread() {
-    notifyAll();
-  }
-
   public interface PlayerListener {
 
     void onPlaybackStarted(long progress);
@@ -185,7 +165,11 @@ public class Player {
   private abstract class Interruption {
     boolean consumeAndClear(long startedOn) {
       interruption = null;
-      return consume(startedOn);
+      boolean keepAlive = consume(startedOn);
+      synchronized (Player.this) {
+        Player.this.notifyAll();
+      }
+      return keepAlive;
     }
 
     abstract boolean consume(long startedOn);
@@ -224,7 +208,6 @@ public class Player {
       } else {
         keepAlive = onFinished();
       }
-      wakeUpMainThread();
       return keepAlive;
     }
   }
@@ -241,7 +224,6 @@ public class Player {
       System.out.println("Playing song " + song.id);
       state = new State(song, state.thread, 0);
       playerListener.onPlaybackStarted(0);
-      wakeUpMainThread();
       return true;
     }
   }
