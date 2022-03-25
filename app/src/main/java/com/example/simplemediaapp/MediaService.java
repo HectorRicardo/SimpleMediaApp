@@ -141,7 +141,7 @@ public class MediaService extends MediaBrowserServiceCompat {
           });
 
   private boolean started = false;
-  private boolean songSet = false;
+  private int songIdx = -1;
   private final MediaSessionCompat.Callback mediaSessionCallback =
       new MediaSessionCompat.Callback() {
 
@@ -159,20 +159,24 @@ public class MediaService extends MediaBrowserServiceCompat {
         @Override
         public void onPlay() {
           prepareForPlayback();
-          if (songSet) {
-            player.play();
+          if (songIdx == -1) {
+            playSong(0);
           } else {
-            Song song = songs[0];
-            mediaSession.setMetadata(
-                metadataBuilder
-                    .putString(METADATA_KEY_TITLE, song.title)
-                    .putString(METADATA_KEY_ARTIST, song.artist)
-                    .putLong(METADATA_KEY_DURATION, song.duration)
-                    .build());
-            notificationsHandler.updateSong();
-            player.play(songs[0]);
-            songSet = true;
+            player.play();
           }
+        }
+
+        private void playSong(int songIdx) {
+          MediaService.this.songIdx = songIdx;
+          Song song = songs[songIdx];
+          mediaSession.setMetadata(
+              metadataBuilder
+                  .putString(METADATA_KEY_TITLE, song.title)
+                  .putString(METADATA_KEY_ARTIST, song.artist)
+                  .putLong(METADATA_KEY_DURATION, song.duration)
+                  .build());
+          notificationsHandler.updateSong();
+          player.play(song);
         }
 
         @Override
@@ -195,12 +199,14 @@ public class MediaService extends MediaBrowserServiceCompat {
 
         @Override
         public void onSkipToNext() {
-          android.util.Log.d("SMA_MSC", "onSkipToNext");
+          prepareForPlayback();
+          playSong((songIdx + 1) % songs.length);
         }
 
         @Override
         public void onSkipToPrevious() {
-          android.util.Log.d("SMA_MSC", "onSkipToPrevious");
+          prepareForPlayback();
+          playSong((songIdx > 0 ? songIdx : songs.length) - 1);
         }
 
         @Override
