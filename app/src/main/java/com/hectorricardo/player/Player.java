@@ -151,6 +151,10 @@ public class Player {
     return false;
   }
 
+  private synchronized void wakeUpMainThread() {
+    notifyAll();
+  }
+
   public interface PlayerListener {
 
     void onPlaybackStarted(long progress);
@@ -220,10 +224,25 @@ public class Player {
       } else {
         keepAlive = onFinished();
       }
-      synchronized (Player.this) {
-        Player.this.notifyAll();
-      }
+      wakeUpMainThread();
       return keepAlive;
+    }
+  }
+
+  private class SongSetInterruption extends Interruption {
+    private final Song song;
+
+    SongSetInterruption(Song song) {
+      this.song = song;
+    }
+
+    @Override
+    boolean consume(long ignored) {
+      System.out.println("Playing song " + song.id);
+      state = new State(song, state.thread, 0);
+      playerListener.onPlaybackStarted(0);
+      wakeUpMainThread();
+      return true;
     }
   }
 }
