@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
     button = findViewById(R.id.playPauseButton);
 
     TextView textView = findViewById(R.id.textView);
-    textView.setText("" + Math.random());
+    textView.setText(stringFromJNI());
 
     mediaClient.onCreate();
   }
@@ -88,4 +88,10 @@ public class MainActivity extends AppCompatActivity {
       button.setOnClickListener(v -> transportControls.play());
     }
   }
+
+  static {
+    System.loadLibrary("simplemediaapp");
+  }
+
+  private native String stringFromJNI();
 }
