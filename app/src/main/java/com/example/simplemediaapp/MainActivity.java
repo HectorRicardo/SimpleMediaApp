@@ -8,6 +8,7 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaControllerCompat.TransportControls;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.widget.Button;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
@@ -48,6 +49,9 @@ public class MainActivity extends AppCompatActivity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
     button = findViewById(R.id.playPauseButton);
+
+    TextView textView = findViewById(R.id.textView);
+    textView.setText("" + Math.random());
 
     mediaClient.onCreate();
   }
